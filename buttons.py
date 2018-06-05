@@ -2,6 +2,7 @@ import pyautogui as gui
 import time
 import vision
 from vision import x_pad, y_pad
+import threading
 
 gui.PAUSE = .05
 
@@ -12,6 +13,7 @@ def button_factory(coords_list):
 
 class Button:
     prev_coords = None
+    lock = threading.Lock()
 
     @staticmethod
     def same_coords(coords):
@@ -29,10 +31,11 @@ class Button:
         self.click(*args, **kwargs)
 
     def click(self, *args, **kwargs):
-        if Button.same_coords(self.coords):
-            gui.click(self.coords[0] + x_pad, self.coords[1] + y_pad, *args, **kwargs)
-        else:
-            gui.click(self.coords[0] + x_pad + 1, self.coords[1] + y_pad, *args, **kwargs)
+        with Button.lock:
+            if Button.same_coords(self.coords):
+                gui.click(self.coords[0] + x_pad, self.coords[1] + y_pad, *args, **kwargs)
+            else:
+                gui.click(self.coords[0] + x_pad + 1, self.coords[1] + y_pad, *args, **kwargs)
 
         if self.pause:
             time.sleep(self.pause)
@@ -63,6 +66,13 @@ class Food:
     onigiri = 0
     california = 1
     gunkan = 2
+
+    @staticmethod
+    def order(name):
+        return Food.make_california() if name == 'california' \
+            else Food.make_gunkan() if name == 'gunkan' \
+            else Food.make_onigiri() if name == 'onigiri' \
+            else None
 
     @staticmethod
     def make_onigiri():
@@ -145,7 +155,3 @@ def click_plates():
 def position():
     pos = gui.position()
     return pos[0] - x_pad, pos[1] - y_pad
-
-
-def click(x, y, *args, **kwargs):
-    gui.click(x + x_pad, y + y_pad, *args, **kwargs)

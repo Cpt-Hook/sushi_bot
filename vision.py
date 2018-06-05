@@ -2,6 +2,7 @@ from PIL import ImageGrab, ImageOps
 import os
 import numpy
 
+# TODO add display calibration
 x_pad = 465
 y_pad = 244
 width = 640
@@ -37,8 +38,7 @@ def get_requests():
 
     for coords in table_coords:
         cropped_img = img.crop(coords)
-        array = numpy.array(cropped_img.getcolors())
-        color_sum = array.sum()
+        color_sum = numpy.array(cropped_img.getcolors()).sum()
         orders.append(food_sums.get(color_sum))
     return orders
 
