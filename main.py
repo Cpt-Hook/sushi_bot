@@ -10,19 +10,23 @@ orders = [None] * 6
 running = True
 
 
-def dish_clicker():
-    global running
-    try:
-        while running:
-            click_plates()
-            sleep(2)
-    except FailSafeException:
-        running = False
-        raise
+class MyThread(threading.Thread):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def run(self):
+        global running
+        try:
+            while running:
+                click_plates()
+                sleep(2)
+        except FailSafeException:
+            running = False
+            raise
 
 
 def main():
-    thread = threading.Thread(target=dish_clicker)
+    thread = MyThread()
     thread.setDaemon(True)
     thread.start()
 
