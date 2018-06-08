@@ -63,10 +63,6 @@ bl = ButtonList
 
 
 class Food:
-    onigiri = 0
-    california = 1
-    gunkan = 2
-
     @staticmethod
     def order(name):
         return Food.make_california() if name == 'california' \

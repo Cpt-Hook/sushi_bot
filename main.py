@@ -10,6 +10,40 @@ orders = [None] * 6
 running = True
 
 
+class Stock:
+    stock = [5, 10, 10, 10, 5, 5]
+
+    @classmethod
+    def available(cls, food):
+        if food == 'gunkan':
+            return cls.stock[1] >= 1 and cls.stock[2] >= 1 and cls.stock[3] >= 2
+        elif food == 'california':
+            return cls.stock[1] >= 1 and cls.stock[2] >= 1 and cls.stock[3] >= 1
+        elif food == 'onigiri':
+            return cls.stock[1] >= 2 and cls.stock[2] >= 1
+        else:
+            raise ValueError
+
+    @classmethod
+    def subtract(cls, food):
+        if food == 'gunkan':
+            cls.stock[1] -= 1
+            cls.stock[2] -= 1
+            cls.stock[3] -= 2
+        elif food == 'california':
+            cls.stock[1] -= 1
+            cls.stock[2] -= 1
+            cls.stock[3] -= 1
+        elif food == 'onigiri':
+            cls.stock[1] -= 2
+            cls.stock[2] -= 1
+        else:
+            raise ValueError
+
+        for food_stock in cls.stock:
+            assert food_stock >= 0
+
+
 class MyThread(threading.Thread):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -42,7 +76,10 @@ def loop():
     for i in range(6):
         if orders[i] != current_orders[i]:
             print(f'Customer at seat {i} - {current_orders[i] if current_orders[i] else "left"}')
-            Food.order(current_orders[i])
+            if Stock.available(current_orders[i]):
+                Food.order(current_orders[i])
+            else:
+                pass # //TODO
     orders = current_orders
 
 
