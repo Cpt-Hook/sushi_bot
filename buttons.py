@@ -93,9 +93,9 @@ class Food:
         bl.finish_food()
 
 
-def food_available(num):
+def food_available(ingredient):
     bl.phone_open()
-    if num == 1:
+    if ingredient == 1:
         bl.phone_rice()
     else:
         bl.phone_topping()
@@ -120,27 +120,34 @@ def food_available(num):
     def salmon():
         return image.getpixel((493, 331)) != (127, 71, 47)
 
-    return {0: shrimp, 1: rice, 2: nori, 3: fish_egg, 4: salmon, 5: unagi}[num]()
+    return {0: shrimp, 1: rice, 2: nori, 3: fish_egg, 4: salmon, 5: unagi}[ingredient]()
 
 
-def order_food(num):
+def order_food(ingredient):
     bl.phone_open()
-    if num == 1:
+    if ingredient == 1:
         bl.phone_rice()
         bl.order_rice()
     else:
         bl.phone_topping()
-        if num == 0:
+        if ingredient == 0:
             bl.order_topping[0]()
-        elif num == 2:
+        elif ingredient == 2:
             bl.order_topping[2]()
-        elif num == 3:
+        elif ingredient == 3:
             bl.order_topping[3]()
-        elif num == 4:
+        elif ingredient == 4:
             bl.order_topping[4]()
-        elif num == 5:
+        elif ingredient == 5:
             bl.order_topping[1]()
     bl.finish_delivery()
+
+
+def start_game(turn_off_sound=False):
+    if turn_off_sound:
+        bl.sound()
+    for button in bl.menu:
+        button()
 
 
 def click_plates():
