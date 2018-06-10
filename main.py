@@ -1,56 +1,58 @@
 from time import sleep
 
-from pyautogui import FailSafeException
-
-from buttons import *
-import vision
 from pygame.time import Clock
 
-orders = [None] * 6
+from buttons import *
+
 running = True
+lock = threading.Lock()
+
+
+class FoodThread(threading.Thread):
+
+    def __init__(self, food, name, *args, **kwargs):
+        super().__init__(name=name, *args, **kwargs)
+        self.food = food
+
+    def run(self):
+        with lock:
+            if Stock.available(self.food):
+                print(f"Making order: {self.getName()}")
+                Food.order(self.food)
+                Stock.subtract(self.food)
+            else:
+                while not Stock.available(self.food):
+                    lock.release()
+                    Stock.new_stock_event.wait()
+                    lock.acquire()
+                print(f"Making order: {self.getName()}")
+                Food.order(self.food)
+                Stock.subtract(self.food)
 
 
 class OrderingThread(threading.Thread):
 
-    def __init__(self, ingredient, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ingredient = ingredient
-
-    def run(self):
-        if Stock.shipping[self.ingredient]:
-            print(f"Ingredient {self.ingredient} already ordered")
-            return
-
-        if food_available(self.ingredient):
-            print(f"Ingredient {self.ingredient} available - ordering")
-            order_food(self.ingredient)
-            Stock.shipped(self.ingredient)
-        else:
-            print(f"Ingredient {self.ingredient} not available - waiting")
-            sleep(6.5)
-            self.run()
-
-
-class PlateClickerThread(threading.Thread):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def run(self):
-        global running
-        try:
-            while running:
-                click_plates()
-                sleep(2)
-        except FailSafeException:
-            running = False
-            raise
+        while True:
+            with lock:
+                for ingredient in range(6):
+                    if Stock.stock[ingredient] < 3 and not Stock.shipping[ingredient]:
+                        if ingredient_available(ingredient):
+                            print(f"Ordering {ingredient}")
+                            order_ingredient(ingredient)
+                            Stock.shipped(ingredient)
+            sleep(2)
 
 
 class Stock:
+    new_stock_event = threading.Event()
     stock = [5, 10, 10, 10, 5, 5]
     order_amount = (5, 10, 10, 10, 5, 5)
     shipping = [False] * 6
-    lock = threading.Lock()
+
     # ingredient_number: amount_needed
     gunkan = {1: 1, 2: 1, 3: 2}
     california = {1: 1, 2: 1, 3: 1}
@@ -58,74 +60,67 @@ class Stock:
 
     @classmethod
     def shipped(cls, ingredient):
-        with cls.lock:
-            cls.shipping[ingredient] = True
-        sleep(6.5)
-        with cls.lock:
-            cls.shipping[ingredient] = False
-            cls.stock[ingredient] += cls.order_amount[ingredient]
+        def arrived():
+            with lock:
+                print(f"Ingredient {ingredient} arrived")
+                cls.shipping[ingredient] = False
+                cls.stock[ingredient] += cls.order_amount[ingredient]
+                cls.new_stock_event.set()
+                cls.new_stock_event.clear()
+
+        cls.shipping[ingredient] = True
+        threading.Timer(6.5, arrived).start()
 
     @classmethod
     def available(cls, food):
-        with cls.lock:
-            for ingredient, number in getattr(cls, food).items():
-                if not (cls.stock[ingredient] >= number):
-                    return False
-            return True
+        for ingredient, number in getattr(cls, food).items():
+            if not (cls.stock[ingredient] >= number):
+                return False
+        return True
 
     @classmethod
     def subtract(cls, food):
-        with cls.lock:
-            for ingredient, number in getattr(cls, food).items():
-                cls.stock[ingredient] -= number
+        for ingredient, number in getattr(cls, food).items():
+            cls.stock[ingredient] -= number
 
-            for food_stock in cls.stock:
-                assert food_stock >= 0
-
-    @classmethod
-    def missing_ingredients(cls, food):
-        missing = []
-        recipe = getattr(cls, food)
-        with cls.lock:
-            for ingredient, number in recipe.items():
-                if cls.stock[ingredient] < number:
-                    missing.append(ingredient)
-        return missing
+        for food_stock in cls.stock:
+            assert food_stock >= 0
 
 
-def new_order(food):
-    if Stock.available(food):
-        Food.order(food)
-        Stock.subtract(food)
-    else:
-        missing = Stock.missing_ingredients(food)
-        print(f"No food left for {food} - missing {missing}")
-        for ingredient in missing:
-            OrderingThread(ingredient).start()
+def main(turn_off_sound=True):
+    print("Starting Sushi go round bot")
+    ordering_thread = OrderingThread()
+    ordering_thread.setDaemon(True)
+
+    print("Entering game")
+    start_game(turn_off_sound)
+    ordering_thread.start()
+
+    try:
+        while running:
+            clock = Clock()
+            loop()
+            clock.tick(20)
+    except KeyboardInterrupt:
+        print("Exiting bot")
 
 
-def main():
-    plate_clicker = PlateClickerThread()
-    plate_clicker.setDaemon(True)
-
-    start_game(turn_off_sound=True)
-    plate_clicker.start()
-
-    while running:
-        clock = Clock()
-        loop()
-        clock.tick(10)
+order_num = 0
+orders = [None] * 6
 
 
 def loop():
-    global orders
+    global orders, order_num
 
     current_orders = vision.get_requests()
     for i in range(6):
         if orders[i] != current_orders[i]:
             if current_orders[i] is not None:
-                print(f'Customer at seat {i} - {current_orders[i]}')
-                new_order(current_orders[i])
+                print(f'Customer at seat {i}, order id: {current_orders[i]}_{order_num}')
+                FoodThread(current_orders[i], name=f'{current_orders[i]}_{order_num}').start()
+                order_num += 1
+            else:
+                threading.Timer(5.5, click_plate, [i]).start()
 
     orders = current_orders
 
