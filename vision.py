@@ -1,10 +1,12 @@
-from PIL import ImageGrab, ImageOps
 import os
+
 import numpy
+from PIL import ImageGrab, ImageOps
 
 # TODO add display calibration
+
 x_pad = 465
-y_pad = 244
+y_pad = 246
 width = 640
 height = 480
 table_coords = (
@@ -14,7 +16,8 @@ table_coords = (
     (336, 56, 383, 83),
     (437, 56, 484, 83),
     (538, 56, 585, 83))
-food_sums = {2232: 'onigiri', 2876: 'california', 2239: 'gunkan'}
+next_level_coords = (183, 365, 424, 390)
+food_sums = {2232: 'onigiri', 2876: 'california', 2239: 'gunkan', 2207: 'salmonroll', 2654: 'shrimpsushi'}
 
 
 def grab_screen():
@@ -43,5 +46,23 @@ def get_requests():
     return orders
 
 
+def level_ended():
+    img = grab_screen()
+    img = ImageOps.grayscale(img)
+    cropped_img = img.crop(next_level_coords)
+    return numpy.array(cropped_img.getcolors()).sum() == 6651
+
+
+def get_food_sums():
+    sums = []
+    img = grab_screen()
+    img = ImageOps.grayscale(img)
+    for coords in table_coords:
+        cropped_img = img.crop(coords)
+        color_sum = numpy.array(cropped_img.getcolors()).sum()
+        sums.append((coords, color_sum))
+    return sums
+
+
 if __name__ == '__main__':
-    print(get_requests())
+    print(level_ended())

@@ -1,8 +1,10 @@
-import pyautogui as gui
+import threading
 import time
+
+import pyautogui as gui
+
 import vision
 from vision import x_pad, y_pad
-import threading
 
 gui.PAUSE = .05
 button_lock = threading.RLock()
@@ -43,18 +45,19 @@ class Button:
 
 class ButtonList:
     sound = Button(314, 373)
-    menu = button_factory([(300, 200), (300, 400), (300, 400), (585, 449), (337, 376)])
+    menu = button_factory(((300, 200), (300, 400), (300, 400), (585, 449), (337, 376)))
+    next_level = button_factory(((321, 381), (321, 381)))
 
-    food = button_factory([(31, 334), (89, 332), (37, 394), (89, 391), (43, 442), (93, 440)])
-    plates = button_factory([(86, 207), (180, 211), (280, 205), (384, 211), (484, 207), (582, 211)])
-    finish_food = Button(207, 383, pause=1.5)
+    food = button_factory(((31, 334), (89, 332), (37, 394), (89, 391), (43, 442), (93, 440)))
+    plates = button_factory(((86, 207), (180, 211), (280, 205), (384, 211), (484, 207), (582, 211)))
+    finish_food = Button(207, 383)
 
     phone_open = Button(589, 344)
     phone_topping = Button(528, 274)
     phone_rice = Button(528, 296)
     phone_exit = Button(586, 345)
 
-    order_topping = button_factory([(486, 225), (572, 223), (494, 277), (572, 283), (494, 337)])
+    order_topping = button_factory(((486, 225), (572, 223), (494, 277), (572, 283), (494, 337)))
     order_rice = Button(541, 286)
     finish_delivery = Button(493, 299)
 
@@ -63,37 +66,27 @@ bl = ButtonList
 
 
 class Food:
-    @staticmethod
-    def order(name):
-        return Food.make_california() if name == 'california' \
-            else Food.make_gunkan() if name == 'gunkan' \
-            else Food.make_onigiri() if name == 'onigiri' \
-            else None
+    # ingredient_number: amount_needed
+    gunkan = {1: 1, 2: 1, 3: 2}
+    california = {1: 1, 2: 1, 3: 1}
+    onigiri = {1: 2, 2: 1}
+    salmonroll = {1: 1, 2: 1, 4: 2}
+    shrimpsushi = {1: 1, 2: 1, 0: 2}
+    last_order_time = 0
 
-    @staticmethod
-    def make_onigiri():
+    @classmethod
+    def order(cls, food):
         with button_lock:
-            bl.food[1]()
-            bl.food[1]()
-            bl.food[2]()
-            bl.finish_food()
+            last_order = (time.time() - cls.last_order_time)
+            if last_order < 1.5:
+                print('sleeping for', 1.5-last_order)
+                time.sleep(1.5 - last_order)
 
-    @staticmethod
-    def make_california():
-        with button_lock:
-            bl.food[1]()
-            bl.food[2]()
-            bl.food[3]()
+            for ingredient, amount in getattr(cls, food).items():
+                for i in range(amount):
+                    bl.food[ingredient]()
             bl.finish_food()
-
-    @staticmethod
-    def make_gunkan():
-        with button_lock:
-            bl.food[1]()
-            bl.food[2]()
-            bl.food[3]()
-            bl.food[3]()
-            bl.finish_food()
+            cls.last_order_time = time.time()
 
 
 def ingredient_available(ingredient):
@@ -116,10 +109,10 @@ def ingredient_available(ingredient):
         return image.getpixel((575, 227)) != (94, 49, 8)
 
     def nori():
-        return image.getpixel((495, 277)) != (33, 30, 11)
+        return image.getpixel((495, 277)) != (53, 53, 39)
 
     def fish_egg():
-        return image.getpixel((575, 277)) != (101, 13, 13)
+        return image.getpixel((575, 277)) != (127, 61, 0)
 
     def salmon():
         return image.getpixel((493, 331)) != (127, 71, 47)
