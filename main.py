@@ -1,8 +1,13 @@
 from pygame.time import Clock
 
-from buttons import *
+import buttons as btn
+import vision
+import threading
+import time
+from pyautogui import FailSafeException
 
-lock = threading.Lock()
+lock = btn.threading.Lock()
+running = True
 
 
 class FoodThread(threading.Thread):
@@ -12,19 +17,24 @@ class FoodThread(threading.Thread):
         self.food = food
 
     def run(self):
-        with lock:
-            if stock.available(self.food):
-                print(f"Making order: {self.getName()}")
-                Food.order(self.food)
-                stock.subtract(self.food)
-            else:
-                while not stock.available(self.food):
-                    lock.release()
-                    stock.new_stock_event.wait()
-                    lock.acquire()
-                print(f"Making order: {self.getName()}")
-                Food.order(self.food)
-                stock.subtract(self.food)
+        try:
+            with lock:
+                if stock.available(self.food):
+                    print(f"Making order: {self.getName()}")
+                    btn.Food.order(self.food)
+                    stock.subtract(self.food)
+                else:
+                    while not stock.available(self.food):
+                        lock.release()
+                        stock.new_stock_event.wait()
+                        lock.acquire()
+                    print(f"Making order: {self.getName()}")
+                    btn.Food.order(self.food)
+                    stock.subtract(self.food)
+        except FailSafeException:
+            global running
+            running = False
+            raise
 
 
 class OrderingThread(threading.Thread):
@@ -34,17 +44,22 @@ class OrderingThread(threading.Thread):
         self.running = True
 
     def run(self):
-        print("Ordering thread started")
-        while self.running:
-            with lock:
-                for ingredient in range(6):
-                    if stock.stock[ingredient] < 3 and not stock.shipping[ingredient]:
-                        if ingredient_available(ingredient):
-                            print(f"Ordering {ingredient}")
-                            order_ingredient(ingredient)
-                            stock.shipped(ingredient)
-            time.sleep(1)
-        print("Ordering thread exited")
+        try:
+            print("Ordering thread started")
+            while self.running:
+                with lock:
+                    for ingredient in range(6):
+                        if stock.stock[ingredient] < 3 and not stock.shipping[ingredient]:
+                            if btn.ingredient_available(ingredient):
+                                print(f"Ordering {ingredient}")
+                                btn.order_ingredient(ingredient)
+                                stock.shipped(ingredient)
+                btn.time.sleep(1)
+            print("Ordering thread exited")
+        except FailSafeException:
+            global running
+            running = False
+            raise
 
 
 class Stock:
@@ -65,18 +80,18 @@ class Stock:
                 self.new_stock_event.clear()
 
         self.shipping[ingredient] = True
-        timer = threading.Timer(6.25, arrived)
+        timer = btn.threading.Timer(6.1, arrived)
         timer.setDaemon(True)
         timer.start()
 
     def available(self, food):
-        for ingredient, amount in getattr(Food, food).items():
+        for ingredient, amount in getattr(btn.Food, food).items():
             if not (self.stock[ingredient] >= amount):
                 return False
         return True
 
     def subtract(self, food):
-        for ingredient, amount in getattr(Food, food).items():
+        for ingredient, amount in getattr(btn.Food, food).items():
             self.stock[ingredient] -= amount
 
         for food_stock in self.stock:
@@ -86,21 +101,48 @@ class Stock:
 stock: Stock
 
 
-def init(turn_off_sound=True):
+def start(find_window=True, turn_off_sound=True):
     level = 1
     print("Starting Sushi go round bot")
+    if find_window:
+        print("Finding windows position.")
+        if vision.set_window_coords():
+            print(f"Game positions found: [{vision.x_pad};{vision.y_pad}]")
+        else:
+            print(f"Game position not found. Using default: [{vision.x_pad};{vision.y_pad}]")
     try:
-        start_game(turn_off_sound)
-        while True:
+        btn.start_game(turn_off_sound)
+        while running:
             print(f"Level: {level} started")
             level += 1
             solve_level()
     except KeyboardInterrupt:
-        print("Exiting bot")
+        pass
+    print("Exiting bot")
 
 
 def solve_level():
+    def loop():
+        nonlocal orders, order_num
+
+        current_orders = vision.get_requests()
+        for i in range(6):
+            if orders[i] != current_orders[i]:
+                if current_orders[i] is not None:
+                    print(f'Customer at seat {i}, order id: {current_orders[i]}_{order_num}')
+                    FoodThread(current_orders[i], name=f'{current_orders[i]}_{order_num}').start()
+                    order_num += 1
+                else:
+                    timer = threading.Timer(5.1, btn.click_plate, [i])
+                    timer.setDaemon(True)
+                    timer.start()
+
+        orders = current_orders
+
     global stock
+    order_num = 0
+    orders = [None] * 6
+
     stock = Stock()
     ordering_thread = OrderingThread()
     ordering_thread.setDaemon(True)
@@ -109,43 +151,21 @@ def solve_level():
 
     start_time = time.time()
     last_check = time.time()
-    while True:
+    while running:
         clock = Clock()
         loop()
-        clock.tick(20)
+        clock.tick(30)
 
         if (time.time() - last_check) > 5:
-            if vision.level_ended():
+            if btn.vision.level_ended():
                 print(f"Level ended in {time.time() - start_time} seconds")
                 ordering_thread.running = False
                 ordering_thread.join()
-                for button in bl.next_level:
+                for button in btn.bl.next_level:
                     button()
                 return
             last_check = time.time()
 
 
-order_num = 0
-orders = [None] * 6
-
-
-def loop():
-    global orders, order_num
-
-    current_orders = vision.get_requests()
-    for i in range(6):
-        if orders[i] != current_orders[i]:
-            if current_orders[i] is not None:
-                print(f'Customer at seat {i}, order id: {current_orders[i]}_{order_num}')
-                FoodThread(current_orders[i], name=f'{current_orders[i]}_{order_num}').start()
-                order_num += 1
-            else:
-                timer = threading.Timer(5.25, click_plate, [i])
-                timer.setDaemon(True)
-                timer.start()
-
-    orders = current_orders
-
-
 if __name__ == '__main__':
-    init(turn_off_sound=True)
+    start(find_window=True, turn_off_sound=True)

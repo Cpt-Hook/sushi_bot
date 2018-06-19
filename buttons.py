@@ -4,9 +4,8 @@ import time
 import pyautogui as gui
 
 import vision
-from vision import x_pad, y_pad
 
-gui.PAUSE = .05
+gui.PAUSE = .025
 button_lock = threading.RLock()
 
 
@@ -35,9 +34,9 @@ class Button:
     def click(self, *args, **kwargs):
         with button_lock:
             if Button.same_coords(self.coords):
-                gui.click(self.coords[0] + x_pad, self.coords[1] + y_pad, *args, **kwargs)
+                gui.click(self.coords[0] + vision.x_pad, self.coords[1] + vision.y_pad, *args, **kwargs)
             else:
-                gui.click(self.coords[0] + x_pad + 1, self.coords[1] + y_pad, *args, **kwargs)
+                gui.click(self.coords[0] + vision.x_pad + 1, self.coords[1] + vision.y_pad, *args, **kwargs)
 
         if self.pause:
             time.sleep(self.pause)
@@ -72,6 +71,8 @@ class Food:
     onigiri = {1: 2, 2: 1}
     salmonroll = {1: 1, 2: 1, 4: 2}
     shrimpsushi = {1: 1, 2: 1, 0: 2}
+    unagiroll = {1: 1, 2: 1, 5: 2}
+
     last_order_time = 0
 
     @classmethod
@@ -79,8 +80,11 @@ class Food:
         with button_lock:
             last_order = (time.time() - cls.last_order_time)
             if last_order < 1.5:
-                print('sleeping for', 1.5-last_order)
+                print('sleeping for', 1.5 - last_order)
+
+                button_lock.release()
                 time.sleep(1.5 - last_order)
+                button_lock.acquire()
 
             for ingredient, amount in getattr(cls, food).items():
                 for i in range(amount):
@@ -156,4 +160,4 @@ def click_plate(plate_num):
 
 def position():
     pos = gui.position()
-    return pos[0] - x_pad, pos[1] - y_pad
+    return pos[0] - vision.x_pad, pos[1] - vision.y_pad
