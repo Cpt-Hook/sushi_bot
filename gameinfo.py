@@ -5,7 +5,7 @@ import pyautogui as gui
 
 import vision
 
-gui.PAUSE = .025
+gui.PAUSE = .05
 button_lock = threading.RLock()
 
 
@@ -73,6 +73,11 @@ class Food:
     shrimpsushi = {1: 1, 2: 1, 0: 2}
     unagiroll = {1: 1, 2: 1, 5: 2}
 
+    food_prices = {'gunkan': 120, 'california': 80, 'onigiri': 60, 'salmonroll': 280, 'shrimpsushi': 320,
+                   'unagiroll': 320}
+    ingredient_prices = {0: 350, 1: 100, 2: 100, 3: 200, 4: 300, 5: 350}
+    ingredient_order_amount = (5, 10, 10, 10, 5, 5)
+
     last_order_time = 0
 
     @classmethod
@@ -80,8 +85,6 @@ class Food:
         with button_lock:
             last_order = (time.time() - cls.last_order_time)
             if last_order < 1.5:
-                print('sleeping for', 1.5 - last_order)
-
                 button_lock.release()
                 time.sleep(1.5 - last_order)
                 button_lock.acquire()
@@ -91,37 +94,6 @@ class Food:
                     bl.food[ingredient]()
             bl.finish_food()
             cls.last_order_time = time.time()
-
-
-def ingredient_available(ingredient):
-    with button_lock:
-        bl.phone_open()
-        if ingredient == 1:
-            bl.phone_rice()
-        else:
-            bl.phone_topping()
-        image = vision.grab_screen()
-        bl.phone_exit()
-
-    def rice():
-        return image.getpixel((545, 284)) != (127, 127, 127)
-
-    def shrimp():
-        return image.getpixel((495, 223)) != (127, 71, 47)
-
-    def unagi():
-        return image.getpixel((575, 227)) != (94, 49, 8)
-
-    def nori():
-        return image.getpixel((495, 277)) != (53, 53, 39)
-
-    def fish_egg():
-        return image.getpixel((575, 277)) != (127, 61, 0)
-
-    def salmon():
-        return image.getpixel((493, 331)) != (127, 71, 47)
-
-    return {0: shrimp, 1: rice, 2: nori, 3: fish_egg, 4: salmon, 5: unagi}[ingredient]()
 
 
 def order_ingredient(ingredient):
