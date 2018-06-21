@@ -1,7 +1,8 @@
 import os
 
 import numpy
-from PIL import ImageGrab, ImageOps, Image
+import pyscreenshot as ImageGrab
+from PIL import ImageOps, Image
 
 x_pad = 465
 y_pad = 246

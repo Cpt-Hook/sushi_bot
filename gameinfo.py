@@ -5,7 +5,7 @@ import pyautogui as gui
 
 import vision
 
-gui.PAUSE = .05
+gui.PAUSE = .05  # some systems cannot handle lower click pause
 button_lock = threading.RLock()
 
 
